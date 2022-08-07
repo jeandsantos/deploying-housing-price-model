@@ -4,6 +4,7 @@ DIR_DATA_TEST = './data/test.csv'
 COL_ID = 'Id'
 
 MISSING_THRESHOLD_DROP = 0.90
+MISSING_THRESHOLD_IMPUTE = 0.50
 
 REGEX_REPL_COLUMN = [
     ('Bsmt', 'Basement'),
