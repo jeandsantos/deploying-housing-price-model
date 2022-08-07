@@ -2,25 +2,29 @@ DIR_DATA_TRAIN = './data/train.csv'
 DIR_DATA_TEST = './data/test.csv'
 
 COL_ID = 'Id'
+COL_TARGET = 'sale_price'
 
-MISSING_THRESHOLD_DROP = 0.90
+MISSING_THRESHOLD_DROP = 0.50
 MISSING_THRESHOLD_IMPUTE = 0.50
+
+FLAG_MISSING_PVALUE_TRESHOLD = 0.05
+FLAG_MISSING_MIN_SAMPLES = 30
 
 REGEX_REPL_COLUMN = [
     ('Bsmt', 'Basement'),
     ('Bldg', 'Building'),
     ('Matl', 'Material'),
     ('Abv', 'Above'),
-    ('Cond', 'Condition'),
+    ('Cond(?!ition)', 'Condition'),
     ('Mas', 'Masonry'),
     ('Vnr', 'Veneer'),
     ('Exter(?=[A-Z])', 'External'),
     ('Qual', 'Quality'),
-    ('Fin', 'Finished'),
+    ('Fin(?=[A-Z])', 'Finished'),
     ('SF', 'SqFt'),
     ('QC', 'QualityCondition'),
     ('Flr', 'Floor'),
-    ('Gr', 'Ground'),
+    ('Grd?', 'Ground'),
     ('Rms', 'Rooms'),
     ('Yr', 'Year'),
     ('Blt', 'Built'),
