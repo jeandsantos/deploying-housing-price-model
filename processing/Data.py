@@ -1,4 +1,9 @@
+
+#TODO Add method to add 'unknown' category for never-seen-before categories
+#TODO Add method to aggregate low count categorical features to 'other' category
+
 import re
+from tabnanny import verbose
 
 import scipy.stats as stats
 import pandas as pd
@@ -38,12 +43,30 @@ class Data:
             for col, type in dtype_dict.items():
                 print(f'Changed \'{col}\' to \'{type}\' type')
 
+
+    def drop_columns_regex(self, regex:str, *args, **kwargs):
         
-    def remove_constant_columns(self):
+        cols = [x for x in self._columns if re.findall(string=x, pattern=regex)]
+        
+        self.drop_columns(cols=cols)
+        self._update_metadata()  
+        
+
+    def drop_columns(self, cols:list, *args, **kwargs):
+        
+        self._df = self._df.drop(columns=cols, *args, **kwargs)      
+        
+        if self.verbose:
+            print(f'\nRemoved columns:\n{cols}')
+        
+        self._update_metadata()  
+            
+        
+    def remove_constant_columns(self, *args, **kwargs):
         column_bool = self._df.apply(lambda x: len(x.unique()) == 1)
         column_desc = self._df.columns[column_bool]
 
-        self._df = self._df.drop(columns=column_desc)      
+        self._df = self._df.drop(columns=column_desc, *args, **kwargs)      
         
         self._update_metadata()  
         
@@ -66,9 +89,6 @@ class Data:
                                 ttest_threshold:float=0.01, 
                                 ttest_min_samples:int=30):
         
-        cols_flagged = []
-        self.col_target = 'sale_price'
-        
         col_missing_bool = self._df.apply(lambda x: x.isnull().sum() > 0)
         col_missing_desc = self._df.columns[col_missing_bool].tolist()
         
@@ -89,16 +109,15 @@ class Data:
                 
                 if results < ttest_threshold:
                     self._df[var] = self._df[col].isnull()
-                
-                    cols_flagged.append((col, var, results))
                     
                     if self.verbose:
                         print(f'Adding flag for \'{col}\': p-value below the threshold: {results:.7f}')
-                        print(f't-test p-value below the threshold: {results:.5f}')
             
             else:
                 if self.verbose:
                     print(f'Skipping \'{col}\' due to data size being below threshold {df_tmp[var].sum()}')
+                    
+            self._update_metadata()
         
 
     def print_column_types(self):
@@ -108,7 +127,7 @@ class Data:
 
     def _update_column_types(self):
         
-        self._cat_columns = self._df.select_dtypes(include=['O']).columns.to_list()
+        self._cat_columns = self._df.select_dtypes(exclude=['float64', 'int64']).columns.to_list()
         self._num_columns = self._df.select_dtypes(include=['float64', 'int64']).columns.to_list()
 
         
