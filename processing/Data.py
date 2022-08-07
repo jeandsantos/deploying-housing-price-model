@@ -36,7 +36,7 @@ class Data:
         
 
     def change_column_types(self, dtype_dict:dict):
-        self._df.astype(dtype=dtype_dict)
+        self._df = self._df.astype(dtype=dtype_dict)
         self._update_column_types()
         
         if self.verbose:
@@ -129,6 +129,9 @@ class Data:
         
         self._cat_columns = self._df.select_dtypes(exclude=['float64', 'int64']).columns.to_list()
         self._num_columns = self._df.select_dtypes(include=['float64', 'int64']).columns.to_list()
+        
+        if verbose:
+            print('Updated column types')
 
         
     def _update_dimensions(self):
