@@ -32,13 +32,23 @@ class Data:
 
         
     def remove_constant_columns(self):
-        constant_bool = self._df.apply(lambda x: len(x.unique()) == 1)
-        constant_cols = self._df.columns[constant_bool]
+        column_bool = self._df.apply(lambda x: len(x.unique()) == 1)
+        column_desc = self._df.columns[column_bool]
 
-        self._df = self._df.drop(columns=constant_cols)        
+        self._df = self._df.drop(columns=column_desc)        
         
         if self.verbose:
-            print(f'Found {np.sum(constant_bool)} constant column(s). Removing columns:\n{constant_cols.tolist()}')
+            print(f'Found {np.sum(column_bool)} constant column(s).\nRemoved columns:\n{column_desc.tolist()}')
+        
+    def remove_missing_columns(self, threshold:float):
+        
+        column_bool = self._df.apply(lambda x: x.isnull().mean() > threshold)
+        column_desc = self._df.columns[column_bool]
+
+        self._df = self._df.drop(columns=column_desc)        
+        
+        if self.verbose:
+            print(f'Found {np.sum(column_bool)} column(s) with missing values above the {threshold} threshold.\nRemoved columns:\n{column_desc.tolist()}')
 
 
     def print_column_types(self):

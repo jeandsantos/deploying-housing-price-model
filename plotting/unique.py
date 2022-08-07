@@ -4,10 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def plot_perc_missing(
+def plot_count_unique(
     df:pd.DataFrame, 
     dtype_include:list=None, 
-    title:str=r'% of Missing Values',
+    title:str='Count of Unique Values',
     figsize:tuple=(6,12),
     *args, **kwargs) -> None:
     
@@ -16,13 +16,10 @@ def plot_perc_missing(
     
     plt.figure(figsize=figsize)
     plt.title(title)
-    plt.xticks(range(0,101,20))
-    plt.xlabel('% Missing Values')
-    plt.axvline(x=50, color='g', linestyle='--')
-    plt.axvline(x=90, color='r', linestyle='--')
     df\
         .select_dtypes(include=dtype_include)\
-        .apply(lambda x: x.isnull().mean()*100)\
+        .apply(lambda x: len(x.unique()))\
         .sort_values(ascending=True)\
-        .plot(kind='barh')
+        .plot(kind='barh', *args, **kwargs)
+    plt.xlabel('Count of Unique Values')
     plt.show()
