@@ -3,11 +3,11 @@
 #TODO Add method to aggregate low count categorical features to 'other' category
 
 import re
-from tabnanny import verbose
 
 import scipy.stats as stats
 import pandas as pd
 import numpy as np
+
 class Data:
     """
     A class to process data 
@@ -34,6 +34,19 @@ class Data:
         self._update_column_types()
         self._update_dimensions()  
         
+        if self.verbose:
+            print('Table metadata updated')
+        
+
+    def create_column(self, col_name:str, values:pd.Series):
+        
+        self._df[col_name] = values
+        
+        self._update_metadata()
+        
+        if self.verbose:
+            print(f'Created column \'{col_name}\'')
+        
 
     def change_column_types(self, dtype_dict:dict):
         self._df = self._df.astype(dtype=dtype_dict)
@@ -49,7 +62,6 @@ class Data:
         cols = [x for x in self._columns if re.findall(string=x, pattern=regex)]
         
         self.drop_columns(cols=cols)
-        self._update_metadata()  
         
 
     def drop_columns(self, cols:list, *args, **kwargs):
