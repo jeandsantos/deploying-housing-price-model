@@ -25,7 +25,7 @@ class Data:
         else:
             self._col_target = col_target
         
-        self.verbose = verbose
+        self._verbose = verbose
         
         self._update_metadata()
         
@@ -34,7 +34,7 @@ class Data:
         self._update_column_types()
         self._update_dimensions()  
         
-        if self.verbose:
+        if self._verbose:
             print('Table metadata updated')
         
 
@@ -44,7 +44,7 @@ class Data:
         
         self._update_metadata()
         
-        if self.verbose:
+        if self._verbose:
             print(f'Created column \'{col_name}\'')
         
 
@@ -52,7 +52,7 @@ class Data:
         self._df = self._df.astype(dtype=dtype_dict)
         self._update_column_types()
         
-        if self.verbose:
+        if self._verbose:
             for col, type in dtype_dict.items():
                 print(f'Changed \'{col}\' to \'{type}\' type')
 
@@ -68,7 +68,7 @@ class Data:
         
         self._df = self._df.drop(columns=cols, *args, **kwargs)      
         
-        if self.verbose:
+        if self._verbose:
             print(f'\nRemoved columns:\n{cols}')
         
         self._update_metadata()  
@@ -82,8 +82,30 @@ class Data:
         
         self._update_metadata()  
         
-        if self.verbose:
+        if self._verbose:
             print(f'Found {np.sum(column_bool)} constant column(s).\nRemoved columns:\n{column_desc.tolist()}')
+            
+    def group_low_count_categories(self, col: str, new_col: str = None, fill_value:str = 'other', threshold:float=0.01):
+        
+        if new_col is None:
+            new_col = col
+            
+        cat_counts = self.df[col].value_counts()
+
+        cat_fraction = cat_counts.to_numpy() / cat_counts.sum() 
+        cat_counts_bool = pd.Series(cat_fraction > threshold, index=cat_counts.index)
+
+        col_mapping = {}
+
+        for val in cat_counts.index:
+            if cat_counts_bool[val]:
+                col_mapping[val] = val
+            else:
+                col_mapping[val] = fill_value
+                
+        self.df[new_col] = self.df[col].replace(col_mapping)
+        
+        return col_mapping
         
     def remove_missing_columns(self, threshold:float):
         
@@ -94,7 +116,7 @@ class Data:
         
         self._update_metadata()
         
-        if self.verbose:
+        if self._verbose:
             print(f'Found {np.sum(column_bool)} column(s) with missing values above the {threshold} threshold.\nRemoved columns:\n{column_desc.tolist()}')
 
     def add_flag_missing_values(self, 
@@ -122,15 +144,44 @@ class Data:
                 if results < ttest_threshold:
                     self._df[var] = self._df[col].isnull()
                     
-                    if self.verbose:
+                    if self._verbose:
                         print(f'Adding flag for \'{col}\': p-value below the threshold: {results:.7f}')
             
             else:
-                if self.verbose:
+                if self._verbose:
                     print(f'Skipping \'{col}\' due to data size being below threshold {df_tmp[var].sum()}')
                     
             self._update_metadata()
+
+
+    def count_unique(self, dtypes: list = None):
         
+        func = lambda x: x.unique().size
+        
+        if dtypes is None:
+            return self._df.apply(func)
+        
+        return self._df.select_dtypes(include=dtypes).apply(func)
+
+
+    def count_missing(self, dtypes: list = None):
+        
+        func = lambda x: x.isnull().sum()
+        
+        if dtypes is None:
+            return self._df.apply(func)
+        
+        return self._df.select_dtypes(include=dtypes).apply(func)
+    
+    def perc_missing(self, dtypes: list = None):
+        
+        func = lambda x: x.isnull().mean()
+        
+        if dtypes is None:
+            return self._df.apply(func)
+        
+        return self._df.select_dtypes(include=dtypes).apply(func)
+
 
     def print_column_types(self):
         print(f'There are {len(self._cat_columns)} categorical fields:\n{self._cat_columns}')
@@ -141,11 +192,8 @@ class Data:
         
         self._cat_columns = self._df.select_dtypes(exclude=['float64', 'int64']).columns.to_list()
         self._num_columns = self._df.select_dtypes(include=['float64', 'int64']).columns.to_list()
-        
-        if verbose:
-            print('Updated column types')
 
-        
+
     def _update_dimensions(self):
         self._nrows, self._ncols  = self._df.shape
 
