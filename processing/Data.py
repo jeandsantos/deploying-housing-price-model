@@ -4,7 +4,7 @@
 
 import re
 
-import scipy.stats as stats
+from scipy.stats import yeojohnson, ttest_ind
 import pandas as pd
 import numpy as np
 
@@ -114,44 +114,64 @@ class Data:
 
         self._df = self._df.drop(columns=column_desc)        
         
-        self._update_metadata()
-        
         if self._verbose:
             print(f'Found {np.sum(column_bool)} column(s) with missing values above the {threshold} threshold.\nRemoved columns:\n{column_desc.tolist()}')
 
-    def add_flag_missing_values(self, 
-                                ttest_threshold:float=0.01, 
-                                ttest_min_samples:int=30):
+        self._update_metadata()
         
-        col_missing_bool = self._df.apply(lambda x: x.isnull().sum() > 0)
-        col_missing_desc = self._df.columns[col_missing_bool].tolist()
+    def add_flag_missing_values(self, 
+                                columns:list=None,
+                                ttest_threshold:float=0.01, 
+                                ttest_min_samples:int=50,
+                                ttest_equal_var:bool=False,
+                                yeojohnson_transform: bool=False,
+                                ):
+        
+        if columns is None:
+            col_missing_bool = self._df.apply(lambda x: x.isnull().sum() > 0)
+            columns = self._df.columns[col_missing_bool].tolist()
         
         # Iterate over columns with missing values
-        for col in col_missing_desc:
+        for col in columns:
+            if self._verbose:
+                print(f'\n{col}')
 
             df_tmp = self._df.copy()
             
-            var = col + '_missing'
-            df_tmp[var] = df_tmp[col].isnull()
+            col_na = col + '_missing'
+            col_na_bool = df_tmp[col].isnull()
 
-            if df_tmp[var].sum() > ttest_min_samples:
-
-                _, results = stats.ttest_ind(
-                    df_tmp[self._col_target][~df_tmp[var]],
-                    df_tmp[self._col_target][df_tmp[var]]
-                    )
+            # Check if there sample size is large enough for statistical test
+            if (col_na_bool.sum() > ttest_min_samples):
                 
+                # Perform Yeo-Johnson transform
+                if yeojohnson_transform:
+                    values, _ = yeojohnson(df_tmp[self._col_target])
+                    values_missing = values[col_na_bool]
+                    values_not_missing = values[~col_na_bool]
+                    
+                    _, results = ttest_ind(values_missing, values_not_missing, equal_var=ttest_equal_var)
+                else:
+                    values_missing = df_tmp[self._col_target][col_na_bool]
+                    values_not_missing = df_tmp[self._col_target][~col_na_bool]
+                    
+                    _, results = ttest_ind(values_missing, values_not_missing, equal_var=ttest_equal_var)
+                
+                # Create flag for missing values
                 if results < ttest_threshold:
-                    self._df[var] = self._df[col].isnull()
+                    self._df[col_na] = self._df[col].isnull()
                     
                     if self._verbose:
-                        print(f'Adding flag for \'{col}\': p-value below the threshold: {results:.7f}')
-            
+                        print(f'Adding flag for \'{col}\', p-value below the threshold {ttest_threshold:.5f}: {results:.12f}')
+                    
+                    self._update_metadata()
+                        
+                elif self._verbose:
+                    print(f'Not adding flag for \'{col}\', p-value above the threshold {ttest_threshold:.5f}: {results:.12f}')
+                    
             else:
                 if self._verbose:
-                    print(f'Skipping \'{col}\' due to data size being below threshold {df_tmp[var].sum()}')
-                    
-            self._update_metadata()
+                    print(f'Skipping \'{col}\' due to data size being below threshold {col_na_bool.sum()}')
 
 
     def count_unique(self, dtypes: list = None):
