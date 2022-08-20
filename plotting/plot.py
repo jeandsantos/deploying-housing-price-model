@@ -11,6 +11,7 @@ custom_params = {
     "axes.spines.top": False
     }
 
+
 def plot_perc_missing(
     df:pd.DataFrame, 
     dtype_include:list=None, 
@@ -30,6 +31,30 @@ def plot_perc_missing(
     df\
         .select_dtypes(include=dtype_include)\
         .apply(lambda x: x.isnull().mean()*100)\
+        .sort_values(ascending=True)\
+        .plot(kind='barh', *args, **kwargs)
+    plt.show()
+
+
+def plot_feature_correlations(
+    df:pd.DataFrame, 
+    col_target:str, 
+    title:str=None,
+    figsize:tuple=(6,12),
+    threshold:float=None,
+    *args, **kwargs) -> None:
+    
+    plt.figure(figsize=figsize)
+    if title is None:
+        title=f'Correlation with {col_target}'
+    plt.title(title)
+    plt.xlabel(f'Correlation')
+    plt.xlim((0.0,1.0))
+    if threshold is not None:
+        plt.axvline(x=threshold, color='r', linestyle='--')
+    df\
+        .corr()[col_target]\
+        .abs()\
         .sort_values(ascending=True)\
         .plot(kind='barh', *args, **kwargs)
     plt.show()

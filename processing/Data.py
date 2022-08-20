@@ -61,7 +61,7 @@ class Data:
         
         cols = [x for x in self._columns if re.findall(string=x, pattern=regex)]
         
-        self.drop_columns(cols=cols)
+        self.drop_columns(cols=cols, *args, **kwargs)
         
 
     def drop_columns(self, cols:list, *args, **kwargs):
@@ -72,7 +72,39 @@ class Data:
             print(f'\nRemoved columns:\n{cols}')
         
         self._update_metadata()  
-            
+
+        
+    def remove_highly_collinear_features(self, 
+                                         threshold:float, 
+                                         dtype_include:list=[float,int], 
+                                         *args, **kwargs):
+        
+        high_corr = self._df\
+            .select_dtypes(include=dtype_include)\
+            .corr()\
+            .abs()\
+            .drop(self._col_target, axis=0)\
+            .drop(self._col_target, axis=1)
+        
+        tri_df = high_corr.mask(np.triu(np.ones_like(high_corr, dtype=bool)))
+        corr_cols_drop = [c for c in tri_df.columns if any(tri_df[c] > threshold)]
+                        
+        if self._verbose:
+            print(f'Removed {len(corr_cols_drop)} column(s) due to high collinearity')
+        
+        self.drop_columns(corr_cols_drop,*args, **kwargs)
+                        
+        
+    def remove_correlation_features(self, threshold:float, *args, **kwargs):
+                        
+        corr_bool = self._df.corr()[self._col_target].abs() < threshold
+        corr_cols_drop = corr_bool.index[corr_bool].tolist()
+        
+        if self._verbose:
+            print(f'Removed {np.sum(corr_bool)} column(s) with low correlation with {self._col_target}')
+        
+        self.drop_columns(corr_cols_drop,*args, **kwargs)
+                        
         
     def remove_constant_columns(self, *args, **kwargs):
         column_bool = self._df.apply(lambda x: len(x.unique()) == 1)
@@ -267,6 +299,9 @@ class Data:
     @col_target.setter
     def col_target(self, new_column):
         self._col_target = new_column
+        
+        if self._verbose:
+            print(f'Set \'{self._col_target}\' as target feature')
 
     @columns.setter
     def columns(self, new_columns):
