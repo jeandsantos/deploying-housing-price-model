@@ -147,3 +147,44 @@ def boxplot_histogram_missingness_relationship(
     plt.rc('legend', loc='upper right')
     plt.suptitle(f'Distribution of \'{col_target}\' based on missingness of \'{col_var}\' values')
     plt.show(*args, **kwargs)
+    
+    
+def plot_correlation_heatmap(
+    df:pd.DataFrame, 
+    cols:list=None, 
+    title:str=r'Correlation Heatmap',
+    figsize:tuple=(14,12),
+    *args, **kwargs) -> None:
+    
+    if cols is None:
+        cols=df.columns
+    
+    plt.figure(figsize=figsize)
+    plt.title(title)
+    sns.heatmap(
+        data=df[cols].corr(),
+        cmap='RdBu_r',
+        *args, **kwargs
+    )
+    plt.show()
+    
+
+def plot_count_unique(
+    df:pd.DataFrame, 
+    dtype_include:list=None, 
+    title:str='Count of Unique Values',
+    figsize:tuple=(6,12),
+    *args, **kwargs) -> None:
+    
+    if dtype_include is None:
+        dtype_include=df.dtypes.unique()
+    
+    plt.figure(figsize=figsize)
+    plt.title(title)
+    df\
+        .select_dtypes(include=dtype_include)\
+        .apply(lambda x: len(x.unique()))\
+        .sort_values(ascending=True)\
+        .plot(kind='barh', *args, **kwargs)
+    plt.xlabel('Count of Unique Values')
+    plt.show()
