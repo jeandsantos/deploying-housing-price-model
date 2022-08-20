@@ -4,7 +4,10 @@
 
 import re
 
-from scipy.stats import yeojohnson, ttest_ind
+from scipy.stats import yeojohnson, ttest_ind, chi2_contingency
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestRegressor
+
 import pandas as pd
 import numpy as np
 
@@ -94,7 +97,7 @@ class Data:
         
         self.drop_columns(corr_cols_drop,*args, **kwargs)
                         
-        
+                        
     def remove_correlation_features(self, threshold:float, *args, **kwargs):
                         
         corr_bool = self._df.corr()[self._col_target].abs() < threshold
@@ -104,7 +107,86 @@ class Data:
             print(f'Removed {np.sum(corr_bool)} column(s) with low correlation with {self._col_target}')
         
         self.drop_columns(corr_cols_drop,*args, **kwargs)
-                        
+    
+
+    def cramers_v(self, col1, col2):
+
+        cross_tab = pd.crosstab(self._df[col1], self._df[col2])
+        chi_sq = chi2_contingency(cross_tab)[0]
+
+        total_observations = cross_tab.values.sum()
+        min_dim = np.min(cross_tab.shape) - 1
+
+        return np.sqrt(chi_sq/(total_observations*min_dim))
+    
+    def remove_highly_correlated_categorical_features(self, 
+                                                      cramer_max_cardinality:int,
+                                                      cramer_threshold:float=0.95,
+                                                      selection_strategy:str='cardinality',
+                                                      *args, **kwargs
+                                                      ):
+
+        cols_bool = self.count_unique() <= cramer_max_cardinality 
+        cols_cardinality = cols_bool.index[cols_bool]
+        cols_cardinality = cols_cardinality[cols_cardinality.isin(self._cat_columns)]
+
+        X = self._df[cols_cardinality].copy()
+        y = self._df[self._col_target].copy()
+
+        res = pd.DataFrame()
+        for col_1 in cols_cardinality:
+            for col_2 in cols_cardinality:
+                if col_1 != col_2:
+                    cramers_v_value = self.cramers_v(col_1, col_2)
+                    
+                    if cramers_v_value > cramer_threshold:
+                        tmp = pd.DataFrame([[col_1, col_2]], columns=['col_1', 'col_2'])
+                        res = res.append(tmp)
+
+        to_remove = set()
+        cardinality = {col:X[col].unique().size for col in cols_cardinality}
+
+        if selection_strategy == 'cardinality':
+            for feature_1 in res.col_1:
+                if feature_1 in to_remove:
+                    next
+                else:
+                    block = res[res.col_1 == feature_1]
+                    max_cardinality=cardinality[feature_1]
+                    
+                    for feature_2 in block.col_2:
+                        if cardinality[feature_2] > max_cardinality:
+                            to_remove.add(feature_1)
+        
+        elif selection_strategy == 'random_forest':
+            
+            label_encoder = LabelEncoder()
+            for col in X.columns:
+                X[col] = label_encoder.fit_transform(X[col])
+            
+            for feature_1 in res.col_1:
+                if feature_1 in to_remove:
+                    next
+                else:
+                    block = res[res.col_1 == feature_1]
+                    
+                    for feature_2 in block.col_2:
+                        if feature_2 in to_remove:
+                            next
+                        else:
+                            rf = RandomForestRegressor(n_estimators=100, random_state=42, max_depth=5)
+                            
+                            train_features=[feature_1, feature_2]
+                            rf.fit(X[train_features], y)
+                            
+                            remove_feature = train_features[rf.feature_importances_.argmin()]
+                            print(f'Removing {remove_feature}')
+                            to_remove.add(remove_feature)
+        
+        self.drop_columns(cols=to_remove, *args, **kwargs)
+        
+        return to_remove    
+        
         
     def remove_constant_columns(self, *args, **kwargs):
         column_bool = self._df.apply(lambda x: len(x.unique()) == 1)
@@ -242,8 +324,8 @@ class Data:
 
     def _update_column_types(self):
         
-        self._cat_columns = self._df.select_dtypes(exclude=['float64', 'int64']).columns.to_list()
-        self._num_columns = self._df.select_dtypes(include=['float64', 'int64']).columns.to_list()
+        self._cat_columns = self._df.select_dtypes(exclude=[int, float]).columns.to_list()
+        self._num_columns = self._df.select_dtypes(include=[int, float]).columns.to_list()
 
 
     def _update_dimensions(self):
