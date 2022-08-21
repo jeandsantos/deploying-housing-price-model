@@ -4,7 +4,7 @@
 
 import re
 
-from scipy.stats import yeojohnson, ttest_ind, chi2_contingency
+from scipy.stats import yeojohnson, ttest_ind, chi2_contingency, f_oneway
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 
@@ -123,6 +123,7 @@ class Data:
 
         return np.sqrt(chi_sq/(total_observations*min_dim))
     
+    
     def remove_highly_correlated_categorical_features(self, 
                                                       cramer_max_cardinality:int,
                                                       cramer_threshold:float=0.95,
@@ -191,6 +192,43 @@ class Data:
         
         return to_remove    
         
+    
+    def remove_categorical_significance_test(self, 
+                                             cols:list=None,
+                                             p_value_threshold:float=0.05,
+                                             yeojohnson_transform:bool=False,
+                                             *args, **kwargs
+                                            ):
+        if cols is None:
+            cols = self._cat_columns
+
+        tmp = self._df[cols + [self._col_target]].copy()
+        
+        if yeojohnson_transform:
+            if self._verbose:
+                print(f'Performing Yeo-Johnson Transformation')
+            values, _ = yeojohnson(tmp[self._col_target])
+            tmp[self._col_target] = values
+
+        to_remove = []
+        for col in cols: 
+            
+            categories_array = tmp.groupby(col)[self._col_target].apply(np.array)
+            
+            if tmp[col].nunique() == 2:
+                _, p_value=ttest_ind(*categories_array)
+            else:
+                _, p_value=f_oneway(*categories_array)
+            
+            if p_value > p_value_threshold:
+                to_remove.append(col)
+                if self._verbose:
+                    print(f'Removing \'{col}\' p-value={p_value:.7f}')
+    
+        self.drop_columns(cols=to_remove, *args, **kwargs)
+        
+        return to_remove    
+    
         
     def remove_constant_columns(self, *args, **kwargs):
         column_bool = self._df.apply(lambda x: len(x.unique()) == 1)
@@ -202,6 +240,7 @@ class Data:
         
         if self._verbose:
             print(f'Found {np.sum(column_bool)} constant column(s).\nRemoved columns:\n{column_desc.tolist()}')
+            
             
     def group_low_count_categories(self, col: str, new_col: str = None, fill_value:str = 'other', threshold:float=0.01):
         
@@ -225,6 +264,7 @@ class Data:
         
         return col_mapping
         
+        
     def remove_missing_columns(self, threshold:float):
         
         column_bool = self._df.apply(lambda x: x.isnull().mean() > threshold)
@@ -236,6 +276,7 @@ class Data:
             print(f'Found {np.sum(column_bool)} column(s) with missing values above the {threshold} threshold.\nRemoved columns:\n{column_desc.tolist()}')
 
         self._update_metadata()
+        
         
     def add_flag_missing_values(self, 
                                 columns:list=None,
