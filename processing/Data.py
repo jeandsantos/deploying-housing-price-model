@@ -110,8 +110,12 @@ class Data:
     
 
     def cramers_v(self, col1, col2):
+        
+        cross_tab = pd.crosstab(
+            np.array(self._df[col1].tolist()),
+            np.array(self._df[col2].tolist())
+            )
 
-        cross_tab = pd.crosstab(self._df[col1], self._df[col2])
         chi_sq = chi2_contingency(cross_tab)[0]
 
         total_observations = cross_tab.values.sum()
